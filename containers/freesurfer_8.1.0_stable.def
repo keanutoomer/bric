@@ -1,0 +1,82 @@
+Bootstrap: docker
+From: rockylinux:8
+
+%labels
+	Author keanu
+	baseVersion Rocky-Linux-8
+	fsVersion 8.1.0-stable
+	defVersion 1.0
+	
+%post
+	set -euo pipefail
+	echo "Base image:"
+	cat /etc/os-release
+
+	dnf -y update
+	dnf -y install curl ca-certificates
+
+	# Fetch pinned RPM and checksum
+	FS_RPM_URL="https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/8.1.0/freesurfer-Rocky8-8.1.0-1.x86_64.rpm"
+	FS_RPM_SHA256="7e1786a4072085776b140286ed498b8e"
+
+	curl -fsSL "$FS_RPM_URL" -o /tmp/fs.rpm
+	echo "${FS_RPM_SHA256}  /tmp/fs.rpm" | sha256sum -c -
+	
+	# Clean up
+	rm -f /tmp/fs.rpm
+	dnf -y clean all
+	rm -rf /var/cache/dnf
+	
+	echo "FreeSurfer:"
+	/opt/freesurfer/bin/recon-all -version
+	
+	# Set fs environment variables
+	echo 'source /opt/freesurfer/SetUpFreeSurfer.sh' >> /environment
+
+%runscript
+	echo "Freesurfer container image (Rocky8)
+        /opt/freesurfer/bin/recon-all -version
+	
+	export OMP_NUM_THREADS=$(nproc)
+	export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$(nproc)
+	export MKL_NUM_THREADS=$(nproc)
+	export OPENBLAS_NUM_THREADS=$(nproc)
+	export NUMEXPR_NUM_THREADS=$(nproc)
+	echo "Threads: $OMP_NUM_THREADS"
+	
+	exec /bin/bash -lc "$@"
+	
+
+%help
+	FreeSurfer 8.1.0 on Rocky Linux 8 (Singularity)
+	
+	Quick use
+	# Show version
+	singularity exec freesurfer_8.1.0_rocky8.sif bash -lc 'recon-all -version'
+
+	# Run recon-all (bind license + data; set SUBJECTS_DIR)
+	singularity exec \
+	   -B /path/to/license.txt:/opt/freesurfer/.license:ro \
+	   -B /path/to/subjects:/subjects \
+	   -B /path/to/work:/work \
+	   freesurfer_8.1.0_rocky8.sif \
+	   bash -lc 'export SUBJECTS_DIR=/subjects; recon-all -s sub-001 -i /work/sub-001_T1w.nii.gz -all -openmp $(nproc)'
+	
+	License options
+	   Bind to /opt/freesurfer/.license (as above), or
+	   Export FS_LICENSE on the host:
+	      export FS_LICENSE=/path/to/license.txt
+	      singularity exec freesurfer_8.1.0_rocky8.sif bash -lc 'recon-all -version'
+	
+	GUI
+	   Use --nv when running OpenGL apps (e.g., freeview):
+	      singularity exec --nv freesurfer_8.1.0_rocky8.sif bash -lc 'freeview --version'
+
+	Threads
+	   This image sets:
+	      OMP_NUM_THREADS, ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS,
+	      MKL_NUM_THREADS, OPENBLAS_NUM_THREADS, NUMEXPR_NUM_THREADS
+	   to $(nproc) at startup. Override per run if needed:
+	      OMP_NUM_THREADS=8 singularity exec ... bash -lc 'recon-all -openmp 8'
+
+
