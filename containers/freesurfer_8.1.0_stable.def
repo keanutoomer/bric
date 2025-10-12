@@ -5,7 +5,7 @@ From: rockylinux:8
 	Author keanu
 	baseVersion Rocky-Linux-8
 	fsVersion 8.1.0-stable
-	defVersion 1.0
+	defVersion 1.1
 	
 %post
 	set -euo pipefail
@@ -19,7 +19,7 @@ From: rockylinux:8
 	FS_RPM_URL="https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/8.1.0/freesurfer-Rocky8-8.1.0-1.x86_64.rpm"
 	FS_RPM_SHA256="7e1786a4072085776b140286ed498b8e"
 
-	curl -fsSL "$FS_RPM_URL" -o /tmp/fs.rpm
+	curl -SL "$FS_RPM_URL" -o /tmp/fs.rpm
 	echo "${FS_RPM_SHA256}  /tmp/fs.rpm" | sha256sum -c -
 	
 	# Clean up
