@@ -2,71 +2,131 @@ Bootstrap: docker
 From: rockylinux:8
 
 %labels
-	Author keanu
+	Author Keanu T
 	baseVersion Rocky-Linux-8
 	fsVersion 8.1.0-stable
-	defVersion 1.1
-	
-%post
+	defVersion 1.6
+
+%setup
+	# This section runs in the host environment at build time
+	set +x +v
 	set -euo pipefail
+
+    FS_RPM="freesurfer-Rocky8-8.1.0-1.x86_64.rpm"
+    FS_RPM_URL="https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/8.1.0/freesurfer-Rocky8-8.1.0-1.x86_64.rpm"
+    FS_RPM_MD5="7e1786a4072085776b140286ed498b8e"
+
+	FS_LICENSE="license.txt"
+
+	# Check for local copy of license file
+	if [ -f "./${FS_LICENSE}" ]; then
+	    echo "Using local license file, copying into container"
+		echo "${FS_LICENSE} to ${SINGULARITY_ROOTFS}/opt/${FS_LICENSE}"
+		cp "./${FS_LICENSE}" "${SINGULARITY_ROOTFS}/opt/${FS_LICENSE}"
+	fi
+
+	# Check for local copy of freesurfer RPM, otherwise download it
+	if [ -f "./${FS_RPM}" ] && echo "${FS_RPM_MD5}  ${FS_RPM}" | md5sum -c --status 2>/dev/null; then
+	    echo "Using local RPM file, copying into container"
+		echo "${FS_RPM} to ${SINGULARITY_ROOTFS}/opt/"
+		cp "./${FS_RPM}" "${SINGULARITY_ROOTFS}/opt/${FS_RPM}"
+	else
+	    echo "Local RPM not found or invalid, downloading from ${FS_RPM_URL}"
+	    curl -SL "${FS_RPM_URL}" -o "${SINGULARITY_ROOTFS}/opt/${FS_RPM}"
+	    if [ "${FS_RPM_MD5} ${SINGULARITY_ROOTFS}/opt/${FS_RPM}" | md5sum -c - ]; then
+	        echo "Downloaded RPM file is valid, using for installation"
+	    else
+	        echo "Downloaded RPM file failed MD5 checksum, please check URL or MD5, exiting"
+	        exit 1
+	    fi
+	fi
+
+%post
+	# This section runs inside the container at build time
+	#set -eo pipefail - fails source
+	set +x +v
+
 	echo "Base image:"
 	cat /etc/os-release
 
-	dnf -y update
-	dnf -y install curl ca-certificates
+	# Install freesurfer
+	FS_RPM=$(echo /opt/freesurfer*.rpm)
+	FS_LICENSE="/opt/license.txt"
+	if [ ! -e "${FS_RPM}" ]; then
+	  	echo "No freesurfer RPM found in /opt, exiting"
+	  	exit 1
+	else
+	  	echo "Found freesurfer RPM: ${FS_RPM}"
+	
+		echo "Updating system packages"
+		dnf -y upgrade
 
-	# Fetch pinned RPM and checksum
-	FS_RPM_URL="https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/8.1.0/freesurfer-Rocky8-8.1.0-1.x86_64.rpm"
-	FS_RPM_SHA256="7e1786a4072085776b140286ed498b8e"
+		echo "Installing dependencies"
+		# Freesurfer dependencies
+		dnf -y install libgomp
 
-	curl -SL "$FS_RPM_URL" -o /tmp/fs.rpm
-	echo "${FS_RPM_SHA256}  /tmp/fs.rpm" | sha256sum -c -
-	
-	# Clean up
-	rm -f /tmp/fs.rpm
-	dnf -y clean all
-	rm -rf /var/cache/dnf
-	
-	echo "FreeSurfer:"
-	/opt/freesurfer/bin/recon-all -version
-	
-	# Set fs environment variables
-	echo 'source /opt/freesurfer/SetUpFreeSurfer.sh' >> /environment
+		echo "Installing freesurfer from RPM"
+	  	dnf -y install "${FS_RPM}"
+
+		if [ ! -e "${FS_LICENSE}" ] || [ ! -s "${FS_LICENSE}" ]; then
+			echo "No freesurfer license found at ${FS_LICENSE}"
+			echo "You will have to bind a valid license at runtime or set FS_LICENSE env var"
+		else
+			echo "Found freesurfer license: ${FS_LICENSE}"
+			mv "${FS_LICENSE}" "${FREESURFER_HOME}/.license"
+		fi
+
+		echo "Installed:"
+		recon-all --version
+
+		rm -rf ${FS_RPM}
+		dnf -y clean all
+		rm -rf /var/cache/dnf
+	fi
+
+%environment
+	export FREESURFER_HOME=$(ls -d /usr/local/freesurfer/* | head -n 1)
+	export FS_MATLAB=0
+	source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
 
 %runscript
-	echo "Freesurfer container image (Rocky8)
-        /opt/freesurfer/bin/recon-all -version
+	echo "Freesurfer container image (Rocky8)"
+    recon-all --version
 	
+	# Set container runtime environment variables
+	# Set number of threads to number of available CPUs
 	export OMP_NUM_THREADS=$(nproc)
 	export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$(nproc)
 	export MKL_NUM_THREADS=$(nproc)
 	export OPENBLAS_NUM_THREADS=$(nproc)
 	export NUMEXPR_NUM_THREADS=$(nproc)
 	echo "Threads: $OMP_NUM_THREADS"
-	
-	exec /bin/bash -lc "$@"
-	
 
+	# If no args provided, start an interactive login shell
+    if [ $# -eq 0 ]; then
+      echo "Starting interactive shell"
+      exec /bin/bash -l
+	  echo "Exiting shell"
+    else
+      # If args provided, run them through bash -lc so shell expansions work
+      echo "Running: $*"
+      exec /bin/bash -lc "$*"
+	  echo "Command finished"
+    fi
+	
 %help
 	FreeSurfer 8.1.0 on Rocky Linux 8 (Singularity)
 	
 	Quick use
 	# Show version
-	singularity exec freesurfer_8.1.0_rocky8.sif bash -lc 'recon-all -version'
+	singularity exec freesurfer_8.1.0_rocky8.sif bash -lc 'recon-all --version'
 
 	# Run recon-all (bind license + data; set SUBJECTS_DIR)
 	singularity exec \
-	   -B /path/to/license.txt:/opt/freesurfer/.license:ro \
-	   -B /path/to/subjects:/subjects \
-	   -B /path/to/work:/work \
+	   -B /path/to/license.txt:/usr/local/freesurfer/8_1_0-1/.license:ro \
+	   -B /path/to/subjects:/work \
 	   freesurfer_8.1.0_rocky8.sif \
-	   bash -lc 'export SUBJECTS_DIR=/subjects; recon-all -s sub-001 -i /work/sub-001_T1w.nii.gz -all -openmp $(nproc)'
-	
-	License options
-	   Bind to /opt/freesurfer/.license (as above), or
-	   Export FS_LICENSE on the host:
-	      export FS_LICENSE=/path/to/license.txt
-	      singularity exec freesurfer_8.1.0_rocky8.sif bash -lc 'recon-all -version'
+	   bash -lc 'recon-all -s sub-001 -i /work/sub-001_T1w.nii.gz -all -openmp $(nproc)'
 	
 	GUI
 	   Use --nv when running OpenGL apps (e.g., freeview):
