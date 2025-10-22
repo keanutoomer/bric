@@ -5,7 +5,7 @@ From: rockylinux:8
 	Author Keanu T
 	baseVersion Rocky-Linux-8
 	fsVersion 8.1.0-stable
-	defVersion 1.6
+	defVersion 1.7
 
 %setup
 	# This section runs in the host environment at build time
@@ -63,8 +63,12 @@ From: rockylinux:8
 
 		echo "Installing dependencies"
 		# Freesurfer dependencies
-		dnf -y install libgomp
-
+		dnf -y install tcsh which tar gzip unzip bzip2 xz wget curl git \
+			git wget tcsh gcc gcc-c++ libgfortran-static make vim-common \
+			lapack-devel lapack-static blas-devel blas-static zlib-devel \
+			python-devel python3-devel \
+			libX11-devel libXmu-devel mesa-libGL-devel 
+  			 
 		echo "Installing freesurfer from RPM"
 	  	dnf -y install "${FS_RPM}"
 
@@ -76,8 +80,13 @@ From: rockylinux:8
 			mv "${FS_LICENSE}" "${FREESURFER_HOME}/.license"
 		fi
 
-		echo "Installed:"
+		export FREESURFER_HOME=$(ls -d /usr/local/freesurfer/* | head -n 1)
+		source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
 		recon-all --version
+
+		echo "Installing MATLAB Runtime R2019b"
+		${FREESURFER_HOME}/bin/fs_install_mcr R2019b
+
 
 		rm -rf ${FS_RPM}
 		dnf -y clean all
@@ -86,7 +95,7 @@ From: rockylinux:8
 
 %environment
 	export FREESURFER_HOME=$(ls -d /usr/local/freesurfer/* | head -n 1)
-	export FS_MATLAB=0
+	export LD_LIBRARY_PATH=$FREESURFER_HOME/MCRv97/runtime/glnxa64:$FREESURFER_HOME/MCRv97/bin/glnxa64:$FREESURFER_HOME/MCRv97/sys/os/glnxa64:$FREESURFER_HOME/MCRv97/extern/bin/glnxa64
 	source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
 
 %runscript
@@ -138,5 +147,3 @@ From: rockylinux:8
 	      MKL_NUM_THREADS, OPENBLAS_NUM_THREADS, NUMEXPR_NUM_THREADS
 	   to $(nproc) at startup. Override per run if needed:
 	      OMP_NUM_THREADS=8 singularity exec ... bash -lc 'recon-all -openmp 8'
-
-
