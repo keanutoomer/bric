@@ -65,7 +65,9 @@ From: rockylinux:8
 
 		echo "Installing dependencies"
 		# Freesurfer dependencies
-		dnf -y install unzip
+		dnf -y install unzip libXt libXext ncurses-compat-libs
+		dnf -y install java-11-openjdk java-11-openjdk-headless
+		dnf -y install libXmu libXp mesa-libGL mesa-libGLU
 
   			 
 		echo "Installing freesurfer from RPM"
