@@ -5,7 +5,7 @@ From: rockylinux:8
 	Author Keanu T
 	baseVersion Rocky-Linux-8
 	fsVersion 8.1.0-stable
-	defVersion 1.9
+	defVersion 1.9.1
 
 # This section runs in the host environment at build time
 %setup
@@ -54,6 +54,7 @@ From: rockylinux:8
 	# Install freesurfer
 	FS_RPM=$(echo /opt/freesurfer*.rpm)
 	FS_LICENSE="/opt/license.txt"
+
 	if [ ! -e "${FS_RPM}" ]; then
 	  	echo "No freesurfer RPM found in /opt, exiting"
 	  	exit 1
@@ -88,7 +89,8 @@ From: rockylinux:8
 		echo "Installing MATLAB Runtime R2019b"
 		${FREESURFER_HOME}/bin/fs_install_mcr R2019b
 		source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
-		echo "MATLAB Runtime installed at ${FREESURFER_HOME}/MCRv97"
+
+		# Set container working directory for startup.m? Otherwise defaults to host $HOME 
 
 		rm -rf ${FS_RPM}
 		dnf -y clean all
