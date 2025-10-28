@@ -5,7 +5,7 @@ From: rockylinux:8
 	Author Keanu T
 	baseVersion Rocky-Linux-8
 	fsVersion 8.1.0-stable
-	defVersion 1.9.1
+	defVersion 2.0.0
 
 # This section runs in the host environment at build time
 %setup
@@ -69,22 +69,26 @@ From: rockylinux:8
 		dnf -y install unzip libXt libXext ncurses-compat-libs
 		dnf -y install java-11-openjdk java-11-openjdk-headless
 		dnf -y install libXmu libXp mesa-libGL mesa-libGLU
-
-  			 
+ 
 		echo "Installing freesurfer from RPM"
 	  	dnf -y install "${FS_RPM}"
 
 		export FREESURFER_HOME=$(ls -d /usr/local/freesurfer/* | head -n 1)
+		source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
+		echo "FREESURFER_HOME is set to ${FREESURFER_HOME}"
 	
 		if [ ! -e "${FS_LICENSE}" ] || [ ! -s "${FS_LICENSE}" ]; then
 			echo "No freesurfer license found at ${FS_LICENSE}"
 			echo "You will have to bind a valid license at runtime or set FS_LICENSE env var"
 		else
 			echo "Found freesurfer license: ${FS_LICENSE}"
-			mv "${FS_LICENSE}" "${FREESURFER_HOME}/.license"
+			echo "Copying ${FS_LICENSE} to ${FREESURFER_HOME}/.license"
+			cp "${FS_LICENSE}" "${FREESURFER_HOME}/.license"
+			chmod 644 "${FREESURFER_HOME}/.license"
 		fi
 
 		source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
+		echo "Freesurfer installation complete, version:"
 		recon-all --version
 
 		echo "Installing MATLAB Runtime R2019b"
@@ -93,6 +97,8 @@ From: rockylinux:8
 
 		# Set container working directory for startup.m? Otherwise defaults to host $HOME 
 
+		echo "Cleaning up temporary container files"
+		rm /opt/license.txt
 		rm -rf ${FS_RPM}
 		dnf -y clean all
 		rm -rf /var/cache/dnf
@@ -101,6 +107,7 @@ From: rockylinux:8
 # Runs before the container starts to setup freesurfer environment
 %environment
 	export FREESURFER_HOME=$(ls -d /usr/local/freesurfer/* | head -n 1)
+	# "LD_LIBRARY_PATH setting is incompatible with Freeview, i.e., you will not be able to run Freeview while LD_LIBRARY_PATH is set for Matlab" - https://surfer.nmr.mgh.harvard.edu/fswiki/rel7downloads/rel8notes
 	export LD_LIBRARY_PATH=$FREESURFER_HOME/MCRv97/runtime/glnxa64:$FREESURFER_HOME/MCRv97/bin/glnxa64:$FREESURFER_HOME/MCRv97/sys/os/glnxa64:$FREESURFER_HOME/MCRv97/extern/bin/glnxa64
 	source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
 
@@ -130,7 +137,7 @@ From: rockylinux:8
     fi
 	
 %help
-	FreeSurfer 8.1.0 on Rocky Linux 8 - Singularity Container
+	FreeSurfer 8.1.0 Rocky Linux 8 - Singularity Container
 	
 	# Show version
 		singularity exec freesurfer_8.1.0_rocky8.sif bash -lc 'recon-all --version'
