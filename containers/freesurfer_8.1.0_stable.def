@@ -74,6 +74,8 @@ From: rockylinux:8
 		echo "Installing freesurfer from RPM"
 	  	dnf -y install "${FS_RPM}"
 
+		export FREESURFER_HOME=$(ls -d /usr/local/freesurfer/* | head -n 1)
+	
 		if [ ! -e "${FS_LICENSE}" ] || [ ! -s "${FS_LICENSE}" ]; then
 			echo "No freesurfer license found at ${FS_LICENSE}"
 			echo "You will have to bind a valid license at runtime or set FS_LICENSE env var"
@@ -82,7 +84,6 @@ From: rockylinux:8
 			mv "${FS_LICENSE}" "${FREESURFER_HOME}/.license"
 		fi
 
-		export FREESURFER_HOME=$(ls -d /usr/local/freesurfer/* | head -n 1)
 		source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
 		recon-all --version
 
