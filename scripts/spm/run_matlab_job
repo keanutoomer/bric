@@ -1,0 +1,99 @@
+#!/bin/bash
+# Spawn SLURM batch calling a matlab function v.1
+# Usage: run_matlab_job <profile> <matlab_script> [arg1 arg2 ...]
+
+set -e
+
+# ------------------ Validate Input ------------------
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <profile> <matlab_script> [args...]"
+    echo "Example: $0 test my_script subject01 taskA"
+    exit 1
+fi
+
+PROFILE="$1"
+MATLAB_SCRIPT="$2"
+shift 2
+MATLAB_ARGS=("$@")  #Remaining arguments
+
+WORKDIR=$(pwd)
+BASE_NAME=$(basename "$MATLAB_SCRIPT" .m)
+JOB_NAME="${BASE_NAME}_%j"
+
+# ------------------ Default SLURM Settings ------------------
+CPUS=1
+TIME="00:10:00"
+PARTITION="cpu_shared"
+
+# ------------------ Profile-Based Resource Allocation ------------------
+case "$PROFILE" in
+    test)
+        CPUS=1
+        TIME="00:02:00"
+        ;;
+    default)
+        CPUS=1
+        TIME="00:10:00"
+        ;;
+    heavy)
+        CPUS=4
+        TIME="02:00:00"
+        ;;
+    singleCoreExtTest)
+	CPUS=1
+	TIME="01:00:00"
+	;;
+    dualCoreExtTest)
+	CPUS=2
+	TIME="00:30:00"
+	;;
+    quadCoreExtTest)
+	CPUS=4
+	TIME="00:30:00"
+	;;
+    *)
+        echo "Unknown profile '$PROFILE'. Using default."
+        ;;
+esac
+
+# ------------------ Format MATLAB Call ------------------
+MATLAB_ARG_STRING=$(printf "'%s'," "${MATLAB_ARGS[@]}")
+MATLAB_ARG_STRING="${MATLAB_ARG_STRING%,}"  # Remove trailing comma
+
+MATLAB_COMMAND="addpath('/users/kltoomer/matlab/scripts'); addpath('/users/kltoomer/matlab/scripts/utils'); addpath('$WORKDIR'); $BASE_NAME($MATLAB_ARG_STRING);"
+
+# ------------------ Submit SLURM Job ------------------
+echo "Submitting MATLAB job:"
+echo "  Profile: $PROFILE"
+echo "  Script: $BASE_NAME"
+echo "  Args: ${MATLAB_ARGS[*]}"
+echo "  CPUs: $CPUS | Time: $TIME"
+
+sbatch --job-name="$JOB_NAME" \
+       --output="${BASE_NAME}_%j.out" \
+       --partition="$PARTITION" \
+       --cpus-per-task="$CPUS" \
+       --time="$TIME" \
+       --wrap="cd '$WORKDIR'; \
+module purge && module load matlab; \
+echo '--- MATLAB Job Started ---'; \
+echo 'Start Time:  ' \$(date); \
+start_time=\$(date +%s); \
+\
+matlab -nodisplay -nosplash -batch \"$MATLAB_COMMAND\"; \
+\
+end_time=\$(date +%s); \
+echo '--- MATLAB Job Finished ---'; \
+echo 'End Time:    ' \$(date); \
+echo Elapsed Time: \$((end_time - start_time)) seconds; \
+\
+echo '--- SLURM Resource Usage ---'; \
+sacct -j \$SLURM_JOB_ID --format=JobID,Elapsed,MaxRSS,MaxVMSize,CPUTime,TotalCPU -P | tail -n +2 | while IFS='|' read -r jobid elapsed maxrss maxvmsize cputime totalcpu; do \
+  echo \"Job ID:              \${jobid}\"; \
+  echo \"Elapsed wall time:   \${elapsed:-N/A}\"; \
+  echo \"Max physical memory: \${maxrss:-N/A}\"; \
+  echo \"Max virtual memory:  \${maxvmsize:-N/A}\"; \
+  echo \"Total CPU time:      \${cputime:-N/A}\"; \
+  echo \"Total CPU (wall*CPU):\${totalcpu:-N/A}\"; \
+done; \
+echo '------------------------------'"

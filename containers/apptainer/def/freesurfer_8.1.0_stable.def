@@ -1,0 +1,160 @@
+Bootstrap: docker
+From: rockylinux:8
+
+%labels
+	Author Keanu T
+	baseVersion Rocky-Linux-8
+	fsVersion 8.1.0-stable
+	defVersion 1.9.1
+
+# This section runs in the host environment at build time
+%setup
+	# Check for local copies of freesurfer RPM and license file and copy them into the container,
+	# otherwise download from surfer.nmr.mgh.harvard.edu
+	set +x +v
+	set -euo pipefail
+
+    FS_RPM="freesurfer-Rocky8-8.1.0-1.x86_64.rpm"
+    FS_RPM_URL="https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/8.1.0/freesurfer-Rocky8-8.1.0-1.x86_64.rpm"
+    FS_RPM_MD5="7e1786a4072085776b140286ed498b8e"
+
+	FS_LICENSE="license.txt"
+
+	# Check for local copy of license file
+	if [ -f "./${FS_LICENSE}" ]; then
+	    echo "Using local license file, copying into container"
+		echo "${FS_LICENSE} to ${SINGULARITY_ROOTFS}/opt/${FS_LICENSE}"
+		cp "./${FS_LICENSE}" "${SINGULARITY_ROOTFS}/opt/${FS_LICENSE}"
+	fi
+
+	# Check for local copy of freesurfer RPM, otherwise download it
+	if [ -f "./${FS_RPM}" ] && echo "${FS_RPM_MD5}  ${FS_RPM}" | md5sum -c --status 2>/dev/null; then
+	    echo "Using local RPM file, copying into container"
+		echo "${FS_RPM} to ${SINGULARITY_ROOTFS}/opt/"
+		cp "./${FS_RPM}" "${SINGULARITY_ROOTFS}/opt/${FS_RPM}"
+	else
+	    echo "Local RPM not found or invalid, downloading from ${FS_RPM_URL}"
+	    curl -SL "${FS_RPM_URL}" -o "${SINGULARITY_ROOTFS}/opt/${FS_RPM}"
+	    if [ "${FS_RPM_MD5} ${SINGULARITY_ROOTFS}/opt/${FS_RPM}" | md5sum -c - ]; then
+	        echo "Downloaded RPM file is valid, using for installation"
+	    else
+	        echo "Downloaded RPM file failed MD5 checksum, please check URL or MD5, exiting"
+	        exit 1
+	    fi
+	fi
+
+# This section runs inside the container at build time
+%post
+	#set -eo pipefail (fails during singularity build - commented out for now)
+	set +x +v
+
+	echo "Base image:"
+	cat /etc/os-release
+
+	# Install freesurfer
+	FS_RPM=$(echo /opt/freesurfer*.rpm)
+	FS_LICENSE="/opt/license.txt"
+
+	if [ ! -e "${FS_RPM}" ]; then
+	  	echo "No freesurfer RPM found in /opt, exiting"
+	  	exit 1
+	else
+	  	echo "Found freesurfer RPM: ${FS_RPM}"
+	
+		echo "Updating system packages"
+		dnf -y upgrade
+
+		echo "Installing dependencies"
+		# Freesurfer dependencies
+		dnf -y install unzip libXt libXext ncurses-compat-libs
+		dnf -y install java-11-openjdk java-11-openjdk-headless
+		dnf -y install libXmu libXp mesa-libGL mesa-libGLU
+ 
+		echo "Installing freesurfer from RPM"
+	  	dnf -y install "${FS_RPM}"
+
+		export FREESURFER_HOME=$(ls -d /usr/local/freesurfer/* | head -n 1)
+		source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
+		echo "FREESURFER_HOME is set to ${FREESURFER_HOME}"
+	
+		if [ ! -e "${FS_LICENSE}" ] || [ ! -s "${FS_LICENSE}" ]; then
+			echo "No freesurfer license found at ${FS_LICENSE}"
+			echo "You will have to bind a valid license at runtime or set FS_LICENSE env var"
+		else
+			echo "Found freesurfer license: ${FS_LICENSE}"
+			echo "Copying ${FS_LICENSE} to ${FREESURFER_HOME}/.license"
+			cp "${FS_LICENSE}" "${FREESURFER_HOME}/.license"
+			chmod 644 "${FREESURFER_HOME}/.license"
+		fi
+
+		source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
+		echo "Freesurfer installation complete, version:"
+		recon-all --version
+
+		echo "Installing MATLAB Runtime R2019b"
+		${FREESURFER_HOME}/bin/fs_install_mcr R2019b
+		source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
+
+		# Set container working directory for startup.m? Otherwise defaults to host $HOME 
+
+		echo "Cleaning up temporary container files"
+		rm /opt/license.txt
+		rm -rf ${FS_RPM}
+		dnf -y clean all
+		rm -rf /var/cache/dnf
+	fi
+
+# Runs before the container starts to setup freesurfer environment
+%environment
+	export FREESURFER_HOME=$(ls -d /usr/local/freesurfer/* | head -n 1)
+	# "LD_LIBRARY_PATH setting is incompatible with Freeview, i.e., you will not be able to run Freeview while LD_LIBRARY_PATH is set for Matlab" - https://surfer.nmr.mgh.harvard.edu/fswiki/rel7downloads/rel8notes
+	export LD_LIBRARY_PATH=$FREESURFER_HOME/MCRv97/runtime/glnxa64:$FREESURFER_HOME/MCRv97/bin/glnxa64:$FREESURFER_HOME/MCRv97/sys/os/glnxa64:$FREESURFER_HOME/MCRv97/extern/bin/glnxa64
+	source ${FREESURFER_HOME}/SetUpFreeSurfer.sh
+
+# Invoked when the container is run with 'singularity run ...'
+%runscript
+	echo "Freesurfer container image (Rocky8)"
+    recon-all --version
+
+	# Set number of threads to number of available CPUs
+	export OMP_NUM_THREADS=$(nproc)
+	export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$(nproc)
+	export MKL_NUM_THREADS=$(nproc)
+	export OPENBLAS_NUM_THREADS=$(nproc)
+	export NUMEXPR_NUM_THREADS=$(nproc)
+	echo "Threads: $OMP_NUM_THREADS"
+
+	# If no args provided, start an interactive login shell
+    if [ $# -eq 0 ]; then
+      echo "Starting interactive shell"
+      exec /bin/bash -l
+	  echo "Exiting shell"
+    else
+      # If args provided, run them through bash -lc so shell expansions work
+      echo "Running: $*"
+      exec /bin/bash -lc "$*"
+	  echo "Command finished"
+    fi
+	
+%help
+	FreeSurfer 8.1.0 Rocky Linux 8 - Singularity Container
+	
+	# Show version
+		singularity exec freesurfer_8.1.0_rocky8.sif bash -lc 'recon-all --version'
+
+	# Run recon-all (bind license + data; set SUBJECTS_DIR)
+		singularity exec \
+	   		-B /path/to/license.txt:/usr/local/freesurfer/8_1_0-1/.license:ro \
+	   		-B /path/to/subjects:/work \
+	   		freesurfer_8.1.0_rocky8.sif \
+	   		bash -lc 'recon-all -s sub-001 -i /work/sub-001_T1w.nii.gz -all -openmp $(nproc)'
+
+	# GUI - Use --nv when running OpenGL apps (e.g., freeview):
+	      singularity exec --nv freesurfer_8.1.0_rocky8.sif bash -lc 'freeview --version'
+
+	# Threads
+	   	This image sets:
+	      	OMP_NUM_THREADS, ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS,
+	      	MKL_NUM_THREADS, OPENBLAS_NUM_THREADS, NUMEXPR_NUM_THREADS
+	   	to $(nproc) at startup. Override per run if needed:
+	      	OMP_NUM_THREADS=8 singularity exec ... bash -lc 'recon-all -openmp 8'
