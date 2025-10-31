@@ -1,3 +1,0 @@
-singularity run --containall --cleanenv -B /users/kltoomer/datasets/hcp_retinotopy/derivatives/freesurfer:/usr/local/freesurfer/8.1.0-1/subjects ~/singularity/containers/freesurfer_8.1.0_stable.sif /bin/sh
-
-singularity run --containall --cleanenv -B /users/kltoomer/datasets/hcp_retinotopy/derivatives/freesurfer:/usr/local/freesurfer/8.1.0-1/subjects -B /users/kltoomer/datasets/hcp_retinotopy/sourcedata:/data:ro ~/singularity/containers/freesurfer_8.1.0_stable.sif /bin/sh
