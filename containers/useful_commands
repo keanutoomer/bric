@@ -1,0 +1,6 @@
+Local docker containers:
+
+neurodesk freesurfer latest
+Start with X11 forwarding
+docker run -it -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix ghcr.io/neurodesk/freesurfer_8.1.0:latest
+add access if neccessary xhost +local:docker 

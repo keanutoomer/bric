@@ -1,0 +1,27 @@
+Bootstrap: docker
+From: rockylinux:8
+
+%labels
+	Author Keanu T
+	baseVersion Rocky-Linux-8
+	defVersion 1.0.0
+
+# This section runs in the host environment at build time
+%setup
+
+# This section runs inside the container at build time
+%post
+	echo "Base image:"
+	cat /etc/os-release
+	
+	echo "Updating system packages"
+	dnf -y upgrade
+
+# Runs before the container starts to setup freesurfer environment
+%environment
+
+# Invoked when the container is run with 'singularity run ...'
+%runscript
+	
+%help
+	This is a Singularity container for Rocky Linux 8.
