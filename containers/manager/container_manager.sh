@@ -14,31 +14,42 @@ container() {
 
     case "$action" in
         load)
-            if [[ ":$PATH:" == *":${bin}:"* ]]; then
-                echo "Container $container already loaded"
+            if [ ! -d "$bin" ]; then
+                echo "Container shim not found for: $container"
+                # Could add fuzzy search here later; since container names are encoded with
+                # versions & bases, base matches could be listed by versison number
+                return 1
             else
-                export PATH="${bin}:${PATH}"
-                echo "Loaded: $container"
+                if [[ ":$PATH:" == *":${bin}:"* ]]; then
+                    echo "Container $container already loaded"
+                else
+                    export PATH="${bin}:${PATH}"
+                    echo "Loaded: $container"
+                fi
             fi
             ;;
         unload)
-            export PATH="${PATH//${bin}:/}"
-            export PATH="${PATH//:${bin}/}"
-            export PATH="${PATH//${bin}/}"
-            echo "Unloaded: $container"
+            if [[ ":$PATH:" == *":${bin}:"* ]]; then
+                export PATH="${PATH//${bin}:/}"
+                export PATH="${PATH//:${bin}/}"
+                export PATH="${PATH//${bin}/}"
+                echo "Unloaded: $container"
+            else
+                echo "Container $container not loaded"
+            fi
             ;;
-        # list)
-        #     echo "Checking loaded containers..."
-        #     for con in ~/containers/bins/*/; do
-        #         conname=$(basename "$con")
-        #         if [[ ":$PATH:" == *":${con}bin:"* ]]; then
-        #             echo "  $conname"
-        #         fi
-        #     done
-        #     ;;
+        list)
+            echo "Checking loaded containers..."
+            for con in ~/containers/bins/*/; do
+                conname=$(basename "$con")
+                if [[ ":$PATH:" == *":${con}bin:"* ]]; then
+                    echo "  $conname"
+                fi
+            done
+            ;;
         avail)
             echo "Available containers:"
-            ls -1 ~/containers/bins
+            ls -1 "${container_bins}" | sed 's/_bins//'
             ;;
         show)
             echo "container: $container"
