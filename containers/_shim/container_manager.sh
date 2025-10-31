@@ -50,10 +50,8 @@ container() {
         avail)
             echo "Shimmable containers:"
             for d in ${containers_dir}/*; do
-                [ -d "${d}/*bin" ] || continue
-                name=$(basename "$d")
-                name=${name%_bin}
-                echo " -- ${name}"
+                [ -d ${d}/$(basename ${d})_bin ] || continue
+                echo " -- $(basename ${d})"
             done
             ;;
         show)
