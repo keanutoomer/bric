@@ -1,7 +1,7 @@
 # container() - Simple container system for creating user shims to containerized applications
 container() {
     local user_home="/users/kltoomer"
-    local containers_dir="${user_home}/bric/containers/"
+    local containers_dir="${user_home}/bric/containers"
     if [ ! -d "$containers_dir" ]; then
         echo "Container directory not found: $containers_dir"
         return 1
@@ -40,7 +40,7 @@ container() {
             ;;
         list)
             echo "Checking loaded containers..."
-            for con in ~/containers/*; do
+            for con in ${containers_dir}/*; do
                 conname=$(basename "$con")
                 if [[ ":$PATH:" == *":${con}_bin:"* ]]; then
                     echo "  $conname"
