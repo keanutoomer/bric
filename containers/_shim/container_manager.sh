@@ -10,7 +10,7 @@ container() {
     # Parse arguments from 'container <command> <container_name>'
     local action="$1"
     local container="$2"
-    local bin="${containers_dir}/${container}/${container}_bins"
+    local bin="${containers_dir}/${container}/${container}_bin"
 
     case "$action" in
         load)

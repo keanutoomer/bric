@@ -1,1 +1,1 @@
-/users/kltoomer/bric/containers/apptainer/shim/wrappers/afni_25.2.16_wrapper.sh
+/users/kltoomer/bric/containers/afni_25.2.17_stable/afni_25.2.17_stable_wrapper.sh
