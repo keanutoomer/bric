@@ -1,0 +1,18 @@
+Bootstrap: docker
+From: ghcr.io/neurodesk/freesurfer_8.1.0:latest
+
+%labels
+    Author Neurodesk
+    Description FreeSurfer 8.1.0 from Neurodesk
+    baseVersion Ubuntu 22.04 LTS
+    fsVersion 8.1.0
+
+%setup
+
+%post
+
+%environment
+
+%runscript
+
+%help
