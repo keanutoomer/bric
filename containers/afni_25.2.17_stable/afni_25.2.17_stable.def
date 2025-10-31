@@ -1,0 +1,18 @@
+Bootstrap: docker
+From: afni/afni:latest
+
+%labels
+    Author AFNI
+    Description AFNI 25.2.17 from Docker
+    baseVersion 
+    afniVersion 25.2.17
+
+%setup
+
+%post
+
+%environment
+
+%runscript
+
+%help
