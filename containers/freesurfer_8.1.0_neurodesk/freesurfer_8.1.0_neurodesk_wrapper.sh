@@ -1,5 +1,5 @@
 #!/bin/sh
-sif_dir="/users/kltoomer/bric/containers/apptainer/sif"
+sif_dir="/users/kltoomer/bric/containers"
 sif_name="freesurfer_8.1.0_neurodesk"
 
 # Adapted from A.Praveen (2025)

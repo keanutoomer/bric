@@ -212,3 +212,6 @@ containers/apptainer/sandboxes/
 # Singularity/Apptainer image files
 *.sif
 *.img
+
+# Dolphin Metadata
+.directory
