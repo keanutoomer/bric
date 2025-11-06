@@ -42,7 +42,7 @@ container() {
             echo "Checking loaded containers..."
             for con in ${containers_dir}/*; do
                 conname=$(basename "$con")
-                if [[ ":$PATH:" == *":${con}_bin:"* ]]; then
+                if [[ ":$PATH:" == *"${con}_bin:"* ]]; then
                     echo "  $conname"
                 fi
             done
